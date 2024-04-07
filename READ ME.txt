@@ -1,0 +1,28 @@
+# BizCardX : Extracting Business Card Data with OCR
+
+BizCardX is a Streamlit web application designed for extracting and managing information from business cards. The application utilizes Optical Character Recognition (OCR) technology to extract text from uploaded images of business cards. The extracted details are then processed and organized into various categories such as name, designation, contact information, company name, email, website, address, etc. Users can upload images of business cards, and the app extracts relevant information for storage and management in a PostgreSQL database.
+
+## Features
+
+- **Text Extraction**: Utilizes EasyOCR library to extract text from uploaded images of business cards.
+- **Data Processing**: Processes the extracted text to identify and categorize different details such as name, designation, contact information, etc.
+- **Database Storage**: Stores the processed information in a PostgreSQL database for easy access and management.
+- **User Interface**: Provides an intuitive user interface built with Streamlit, allowing users to easily upload business card images, extract details, and manage the stored data.
+
+## Technologies Used
+
+- **Python**: Core programming language used for development.
+- **Streamlit**: Web application framework used for building the user interface.
+- **EasyOCR**: Optical Character Recognition library used for extracting text from images.
+- **Pandas**: Data manipulation library used for processing and organizing extracted information.
+- **SQLAlchemy**: SQL toolkit and Object-Relational Mapping (ORM) library used for database operations.
+- **PostgreSQL**: Relational database management system used for storing business card information.
+
+## How to Use
+
+1. Clone the repository to your local machine.
+2. Install the required dependencies listed in the `requirements.txt` file.
+3. Set up a PostgreSQL database and adjust the database connection string in the `app.py` file accordingly.
+4. Run the Streamlit application by executing the command `streamlit run app.py` in your terminal.
+5. Access the application in your web browser and use the menu options to upload business card images, extract details, and manage the stored data.
+
