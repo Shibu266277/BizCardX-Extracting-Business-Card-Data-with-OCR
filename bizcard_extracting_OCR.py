@@ -1,158 +1,272 @@
 # Package
-# image_processing
-import easyocr
-from PIL import Image
-import re
-# database
-import pandas as pd
-from sqlalchemy import create_engine, update, MetaData, Table
-# app
-import os
+# image processing and database 
 import streamlit as st
 from streamlit_option_menu import option_menu
+import easyocr
+from PIL import Image
+import pandas as pd
 import numpy as np
-import PIL
-from PIL import Image, ImageDraw
-import cv2
+import re
+import time
+import psycopg2
 
+#----------------------****----------------------------#
 
-# [Database library]
-import sqlalchemy
-import mysql.connector
-from sqlalchemy import create_engine, inspect
+#Image card pic convert to text format
+def image_to_text(path):
+    input_pic=Image.open(path)
+    img_array=np.array(input_pic)
 
+    reader=easyocr.Reader(['en'])
+    text=reader.readtext(img_array,detail=0)
+    return text
 
+#----------------------****----------------------------#
 
+# Extract data to text view
+def extract_text(texts):
+    extract_dic = {
+        "Name": [],"Designation": [],"Company_Name": [],"Contact": [],"EMail": [],"Website": [],"Address": [],"Pincode": []}
 
+    extract_dic["Name"].append(texts[0])
+    lower = texts[1].lower()
+    extract_dic["Designation"].append(lower)
 
+    for i in range(2, len(texts)):
+        if texts[i].startswith("+") or '-' in texts[i] or (texts[i].replace("-", " ").isdigit() and '-' in texts[i]):
+            extract_dic["Contact"].append(texts[i])
+            
+        elif '@' in texts[i] and '.com' in texts[i]:
+            extract_dic["EMail"].append(texts[i])
+            
+        elif 'www' in texts[i] or 'WWW' in texts[i] or 'wwW' in texts[i] or 'Www' in texts[i]:
+            lower = texts[i].lower()
+            extract_dic["Website"].append(lower)
+            
+        elif 'TamilNadu' in texts[i] or 'Tamil Nadu' in texts[i] or texts[i].isdigit():
+            extract_dic["Pincode"].append(texts[i])
+            
+        elif re.match(r'^[A-Z a-z]', texts[i]):
+            extract_dic["Company_Name"].append(texts[i])
+            
+        else:
+            removeextra=re.sub(r'[,;]','',texts[i])
+            extract_dic["Address"].append(removeextra)
+            
+    for key , value  in extract_dic.items():
+        if len(value)>0:
+            concad="".join(value)
+            extract_dic[key]=[concad]
+        else:
+            value ="NA"
+            extract_dic[key]=[value]         
+            
+    return extract_dic
 
-# Upload image path code below:
-def image_to_text(image_path):
-    
-    # Read the image
-    image_img = Image.open(image_path)
+#-----------------------****---------------------------#
 
-    image_arr=np.array(image_img)
+# streamlit page creating 
 
-    reader= easyocr.Reader(['en'],gpu=False)
-    text= reader.readtext(image_arr, detail=0)
-
-    return text, image_img
-
-
-# Extracted Bisz Card Data:
-def extracted_text(texts):
-   extrd_dict={"NAME":[], "DESIGNATION":[], "COMPANY":[], "CONTACT":[], "EMAIL":[], "WEBSITE":[],
-               "ADDRESS":[], "PINCODE":[]}
-   extrd_dict["NAME"].append(texts[0])
-   extrd_dict["DESIGNATION"].append(texts[1])
-
-   for i in range(2,len(texts)):
-      if texts[i].startswith("+") or (texts[i].replace("-","").isdigit() and '-'in texts[i]):
-         extrd_dict ["CONTACT"].append(texts[i])
-
-      elif "@" in texts[i] and ".com" in texts[i]:
-         extrd_dict["EMAIL"].append(texts[i])
-
-      elif "www" in texts[i].lower() or "www" in texts[i].lower() or "www" in texts[i] or "www" in texts[i] or "www" in texts[i]:
-         small=texts[i].lower()
-         extrd_dict["WEBSITE"].append(small)
-
-      elif "TamilNadu" in texts[i] or "TAMILNADU" in texts[i] or texts[i].isdigit():
-         extrd_dict["PINCODE"].append(texts[i])
-
-      elif re.match(r'^[A-Za-z]', texts[i]):
-         extrd_dict["COMPANY"].append(texts[i])    
-
-      else:
-         remove_colon=re.sub(r'[,;]','',texts[i]) 
-         extrd_dict["ADDRESS"].append(remove_colon)
-
-   for key,value in extrd_dict.items():
-      if len(value)>0:
-         concadenate=" ".join(value)
-         extrd_dict[key]=[concadenate]
-
-      else:
-         value = "NA"
-         extrd_dict[key]= [value]
-
-   return extrd_dict
-
-
-def store_data(data):
-    # Converting dictionary to DataFrame
-    df = pd.DataFrame([data]) # Wrap data in a list to create DataFrame
-    # Storing DataFrame in SQL table
-    df.to_sql('business_card', if_exists='append', index=False)
-    return df
-
-
-# Streamlit Page FUNC:
 st.set_page_config(page_title= "BizCardX",
                    page_icon= '💼',
                    layout= "wide",)
 
-text = 'Extracting Business Card Data'   
-st.markdown(f"<h2 style='color: white; text-align: center;'>{text} </h2>", unsafe_allow_html=True)
+with st.sidebar:      
 
-
-col1,col2 = st.columns([1,4])
-with col1:
-    menu = option_menu("Menu", ["Home","Upload","Database"], 
-                    icons=["house",'cloud-upload', "list-task"],
-                    menu_icon="cast",
-                    default_index=0,
-                    styles={"icon": {"color": "orange", "font-size": "20px"},
-                            "nav-link": {"font-size": "15px", "text-align": "left", "margin": "-2px", "--hover-color": "#FFFFFF"},
-                            "nav-link-selected": {"background-color": "#225154"}})
-    if menu == 'Database':
-        Database_menu = option_menu("Database", ['Modify','Delete'], 
-                        
-                        menu_icon="list-task",
+    selected = option_menu ("Menu", ['Home','Upload Image','View & Modify','Delete','Contact Us'], 
+                        icons=['house','cloud-upload','gear','trash','phone'],
+                        menu_icon="cast",
                         default_index=0,
                         styles={"icon": {"color": "orange", "font-size": "20px"},
-                                "nav-link": {"font-size": "15px", "text-align": "left", "margin": "0px", "--hover-color": "#FFFFFF"},
+                                "nav-link": {"font-size": "15px", "text-align": "left", "margin": "-2px", "--hover-color": "#FFFFFF"},
                                 "nav-link-selected": {"background-color": "#225154"}})
 
 
-
-with col2:
-    if menu == 'Home':
-        st.header('Welcome to BizCardX')
-        home_text = ('This app helps you extract and manage business card details efficiently.')
-        st.markdown(f"<h4 text-align: left;'>{home_text} </h4>", unsafe_allow_html=True)
-        st.subheader(':orange[About the App:]')
-        above_text = ('''BizCardX is a Streamlit web application designed for extracting information 
-                     from business cards. It utilizes OCR (Optical Character Recognition) to extract 
-                     text from uploaded images of business cards. The extracted details are then processed 
-                     and organized into categories such as name, designation, contact information, company 
-                     name, email, website, address, etc. Users can upload images of business cards, and the app 
-                     extracts relevant information for storage and management.
-                    ''')
-                        
-        st.markdown(f"<h4 text-align: left;'>{above_text} </h4>", unsafe_allow_html=True)
-        st.subheader(":orange[Technologies Used:]")
-        tech_text =(''' The app is built using Python and several libraries, including Streamlit for the web 
-                    interface, EasyOCR for optical character recognition, and SQLAlchemy for database operations. 
-                    The user interface is designed to be intuitive, allowing users to easily upload business card images, 
-                    extract details, and manage the stored data. ''')
-        st.markdown(f"<h4 text-align: left;'>{tech_text} </h4>", unsafe_allow_html=True)
+if selected == 'Home':
+    st.header('Welcome To BizCardX:Extracting Business Card Data With OCR')
+    home_text = ('This app helps you extract and manage business card details efficiently.')
+    st.markdown(f"<h4 text-align: left;'>{home_text} </h4>", unsafe_allow_html=True)
+    st.subheader(':orange[About the App:]')
+    above_text = ('''BizCardX is a Streamlit web application designed for extracting information 
+                    from business cards. It utilizes OCR (Optical Character Recognition) to extract 
+                    text from uploaded images of business cards. The extracted details are then processed 
+                    and organized into categories such as name, designation, contact information, company 
+                    name, email, website, address, etc. Users can upload images of business cards, and the app 
+                    extracts relevant information for storage and management.
+                ''')
+                    
+    st.markdown(f"<h4 text-align: left;'>{above_text} </h4>", unsafe_allow_html=True)
+    st.subheader(":orange[Technologies Used:]")
+    tech_text =(''' The app is built using Python and several libraries, including Streamlit for the web 
+                interface, EasyOCR for optical character recognition, and SQLAlchemy for database operations. 
+                The user interface is designed to be intuitive, allowing users to easily upload business card images, 
+                extract details, and manage the stored data. ''')
+    st.markdown(f"<h4 text-align: left;'>{tech_text} </h4>", unsafe_allow_html=True)
 
 
-    if menu == 'Upload':
+
+
+if selected=="Upload Image":                  
+    uploaded_files = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
+
+    if uploaded_files is not None:
+        st.image(uploaded_files,width=150)  
         
-        path = False
-        col3,col4 = st.columns([2,2])
-        with col3:
-            uploaded_file = st.file_uploader("**Choose a file**", type=["jpg", "png", "jpeg"])
+        text_img = image_to_text(uploaded_files)
+        text_dict = extract_text(text_img)
+        
+        if text_dict:
+            st.success("Text is Extracted Successfully")
+            df = pd.DataFrame(text_dict)
+            st.dataframe(df)
             
-            if uploaded_file is not None:
-                image_path = os.getcwd()+ "\\"+"Business Cards"+"\\"+ uploaded_file.name
-                image = Image.open(image_path)
-                col3.image(image)
-                path = True
+        button1=st.button(":red[Save Text]",use_container_width=True)
+        
+        if button1:            
+            mydb = psycopg2.connect(host="localhost",
+                user="postgres", password="12345",
+                database="bizcard",port="5432")
+            cursor = mydb.cursor()
 
-                extract = st.button("Extract")
+            create_table = '''create table if not exists bizcard_details(
+                                name varchar(99),designation varchar(99),
+                                company_name varchar(99),contact varchar(99),
+                                email varchar(99),website text,
+                                address text,pincode varchar(99))'''
 
-                upload = st.button("Upload")
+            cursor.execute(create_table)
+            mydb.commit()            
+            cursor = mydb.cursor()
+            insert_data = '''insert into bizcard_details(name,designation,company_name,contact,
+                                email,website,address,pincode) values(%s,%s,%s,%s,%s,%s,%s,%s)'''
+            data =df.values.tolist()
+            cursor.executemany(insert_data, data)
+            mydb.commit()
+            st.success("!!!Data Inserted Successfully!!!")
+        
+if selected=="View & Modify":                 
+    selected_option = st.selectbox("Select Below Options", [ "Preview text", "Modify text"])
+    if selected_option == "Select Below Options":
+        pass
+    elif selected_option == "Preview text":
+                    mydb = psycopg2.connect(host="localhost",user="postgres", password="12345",
+                                            database="bizcard",port="5432")
+                    cursor = mydb.cursor()                
+                    select_data="select * from bizcard_details"
+                    cursor.execute(select_data)
+                    table=cursor.fetchall()
+                    mydb.commit()
+                    table_df=pd.DataFrame(table,columns=("name","designation","company_name","contact","email","website","address","pincode"))
+                    table_df
+        
+    elif selected_option == "Modify text":
+                    mydb = psycopg2.connect(host="localhost",
+                                            user="postgres", password="12345",
+                                            database="bizcard",port="5432")
+                    cursor = mydb.cursor()
+                    select_data="select * from bizcard_details"
+                    cursor.execute(select_data)
+                    table=cursor.fetchall()
+                    mydb.commit()
+                    table_df=pd.DataFrame(table,columns=("name","designation","company_name","contact","email","website","address","pincode"))
+
+                    select_name=st.selectbox("Select the Name",table_df["name"])
+                    df3=table_df[table_df["name"]==select_name]
+                
+                    df4=df3.copy()
+                    st.dataframe(df4)   
+                    
+                    coll1,coll2=st.columns(2)
+                    with coll1:     
+                        data_name=st.text_input("Name",df3["name"].unique()[0])      
+                        data_design=st.text_input("Designation",df3["designation"].unique()[0])    
+                        data_company=st.text_input("Company_name",df3["company_name"].unique()[0])    
+                        data_contact=st.text_input("Contact",df3["contact"].unique()[0])  
+                        
+                        df4["name"]=data_name
+                        df4["designation"]=data_design
+                        df4["company_name"]=data_company
+                        df4["contact"]=data_contact
+                                        
+        
+                    with coll2:     
+                        data_mail=st.text_input("Email",df3["email"].unique()[0])      
+                        data_web=st.text_input("Website",df3["website"].unique()[0])    
+                        data_address=st.text_input("Address",df3["address"].unique()[0])    
+                        data_pincode=st.text_input("Pincode",df3["pincode"].unique()[0]) 
+                        
+                        df4["email"]=data_mail
+                        df4["website"]=data_web
+                        df4["address"]=data_address
+                        df4["pincode"]=data_pincode
+                    
+                    st.dataframe(df4)    
+                    
+                    coll1, coll2 = st.columns(2)
+                    with coll1:
+                        button2 = st.button("Modify Text", use_container_width=True)
+                        mydb = psycopg2.connect(host="localhost", user="postgres", password="12345", database="bizcard", port="5432")
+                        cursor = mydb.cursor()
+
+                    if button2:
+                                            
+                        cursor.execute(f"delete from bizcard_details where name='{select_data}'")
+                        mydb.commit()
+
+                        insert_data = '''insert into bizcard_details(name,designation,company_name,contact,email,website,address,pincode)
+                                        values(%s,%s,%s,%s,%s,%s,%s,%s)'''
+                        data = df4.values.tolist()
+                        cursor.executemany(insert_data, data)
+                        mydb.commit()
+                        st.success("Above the Text data Modify Successfully")
+                        
+if selected == "Delete": 
+    mydb = psycopg2.connect(host="localhost", user="postgres", password="12345", database="bizcard", port="5432")
+    cursor = mydb.cursor()
+
+    coll1, coll2 = st.columns(2)
+    with coll1:
+        select_data = "SELECT name FROM bizcard_details"
+        cursor.execute(select_data)
+        table5 = cursor.fetchall()
+        mydb.commit()
+
+        names = [i[0] for i in table5]
+        name_select = st.selectbox("Select the Name", names)
+
+        if st.button("Delete", use_container_width=True):
+                delete_query = "DELETE FROM bizcard_details WHERE name = %s"
+                cursor.execute(delete_query, (name_select,))
+                mydb.commit()
+                st.success("Deleted Successfully")
+
+
+
+
+     
+if selected==("Contact Us"):
+    st.title("*:green[BizCardX]*")
+    st.subheader("Contact Us")
+
+    coll1, coll2 = st.columns(2)
+    with coll1:
+            st.subheader('Shibu')
+            st.caption('Mobile:- 9944266277, E-Mail - shibu266277@gmail.com')
+            st.caption('** Any Future Enquire Feel Free To Call Us **')
+            st.caption(":orange [Note: * fill all mandatory fields]")     
+            Name = st.text_input("Name*")
+            Mobile = st.text_input("Mobile*")
+            Email = st.text_input("Email*")
+            Message = st.text_area("Message (optional)")
+
+            if st.button("Submit"):
+                st.success('''!!! Thank you for your Valuable comments & rating !!!''')
+
+    with coll2:
+            st.link_button("Git Hub", "https://en.wikipedia.org/wiki/GitHub")
+            st.link_button("Linked in", "https://en.wikipedia.org/wiki/LinkedIn")
+            st.link_button("Instagram", "https://en.wikipedia.org/wiki/Instagram")
+            st.link_button("Whatsapp", "https://en.wikipedia.org/wiki/WhatsApp")
+            st.link_button("E-Mail", "https://en.wikipedia.org/wiki/Email")     
+
+#================================================xxx=============================================================#
