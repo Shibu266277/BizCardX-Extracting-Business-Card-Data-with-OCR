@@ -67,6 +67,7 @@ def extract_text(texts):
 
 # streamlit page creating 
 
+# Menu Page option
 st.set_page_config(page_title= "BizCardX",
                    page_icon= '💼',
                    layout= "wide",)
@@ -81,7 +82,7 @@ with st.sidebar:
                                 "nav-link": {"font-size": "15px", "text-align": "left", "margin": "-2px", "--hover-color": "#FFFFFF"},
                                 "nav-link-selected": {"background-color": "#225154"}})
 
-
+# Few Description For Biz cards 
 if selected == 'Home':
     st.header('Welcome To BizCardX:Extracting Business Card Data With OCR')
     home_text = ('This app helps you extract and manage business card details efficiently.')
@@ -105,7 +106,7 @@ if selected == 'Home':
 
 
 
-
+# Upload Image and Store Postgres With Table View Data   
 if selected=="Upload Image":                  
     uploaded_files = st.file_uploader("Choose an image", type=["jpg", "jpeg", "png"])
 
@@ -143,7 +144,9 @@ if selected=="Upload Image":
             cursor.executemany(insert_data, data)
             mydb.commit()
             st.success("!!!Data Inserted Successfully!!!")
+
         
+# Veiw The Database, Store in Postgres        
 if selected=="View & Modify":                 
     selected_option = st.selectbox("Select Below Options", [ "Preview text", "Modify text"])
     if selected_option == "Select Below Options":
@@ -158,7 +161,8 @@ if selected=="View & Modify":
                     mydb.commit()
                     table_df=pd.DataFrame(table,columns=("name","designation","company_name","contact","email","website","address","pincode"))
                     table_df
-        
+
+    # Data Details Can Edit and Modify The Details    
     elif selected_option == "Modify text":
                     mydb = psycopg2.connect(host="localhost",
                                             user="postgres", password="12345",
@@ -219,7 +223,8 @@ if selected=="View & Modify":
                         cursor.executemany(insert_data, data)
                         mydb.commit()
                         st.success("Above the Text data Modify Successfully")
-                        
+
+# Unwanted Data Details Deleting Option                        
 if selected == "Delete": 
     mydb = psycopg2.connect(host="localhost", user="postgres", password="12345", database="bizcard", port="5432")
     cursor = mydb.cursor()
@@ -240,10 +245,7 @@ if selected == "Delete":
                 mydb.commit()
                 st.success("Deleted Successfully")
 
-
-
-
-     
+# Contact Deatil For Customer and Feedback To Company     
 if selected==("Contact Us"):
     st.title("*:green[BizCardX]*")
     st.subheader("Contact Us")
