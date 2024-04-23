@@ -263,7 +263,6 @@ if selected==("Contact Us"):
 
             if st.button("Submit"):
                 st.success('''!!! Thank you for your Valuable comments & rating !!!''')
-
     with coll2:
             st.link_button("Git Hub", "https://en.wikipedia.org/wiki/GitHub")
             st.link_button("Linked in", "https://en.wikipedia.org/wiki/LinkedIn")
